@@ -49,7 +49,7 @@ The server runs on `http://0.0.0.0:8000`.
 
 ## Testing
 
-### Manual Testing (Recommended)
+### Manual Testing
 **The primary way to test this application is using the `index.html` file.**
 
 1. Ensure the server is running.
