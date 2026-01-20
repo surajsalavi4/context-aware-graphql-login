@@ -95,6 +95,12 @@
         <h2>Test Scenarios</h2>
 
         <div class="scenario">
+            <div class="scenario-title">Validation Failure</div>
+            <div class="scenario-desc">Invalid email format to test input validation.</div>
+            <button onclick="runTest('not-an-email', 'short', '1.2.3.4')">Run Test</button>
+        </div>
+
+        <div class="scenario">
             <div class="scenario-title">Normal Login (Success)</div>
             <div class="scenario-desc">Standard login with valid credentials (user@normal.com).</div>
             <button onclick="runTest('user@normal.com', 'password123', '1.2.3.4')">Run Test</button>
