@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login API Tester</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+
+        .sidebar {
+            width: 40%;
+            padding: 20px;
+            background: #fff;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+        }
+
+        .output {
+            width: 60%;
+            padding: 20px;
+            background: #ffffff;
+            color: #333333;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid #ddd;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .scenario {
+            background: #f9f9f9;
+            border: 1px solid #eee;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            transition: transform 0.1s;
+        }
+
+        .scenario:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .scenario-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .scenario-desc {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+            font-style: italic;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Consolas', 'Monaco', monospace;
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="sidebar">
+        <h2>Test Scenarios</h2>
+
+        <div class="scenario">
+            <div class="scenario-title">Normal Login (Success)</div>
+            <div class="scenario-desc">Standard login with valid credentials (user@normal.com).</div>
+            <button onclick="runTest('user@normal.com', 'password123', '1.2.3.4')">Run Test</button>
+        </div>
+
+        <div class="scenario">
+            <div class="scenario-title">Normal Login (Failure)</div>
+            <div class="scenario-desc">Standard login with wrong password.</div>
+            <button onclick="runTest('user@normal.com', 'wrongpass', '1.2.3.4')">Run Test</button>
+        </div>
+
+        <div class="scenario">
+            <div class="scenario-title">MFA Login (Challenge Required)</div>
+            <div class="scenario-desc">Org requires MFA, user provides no code. Expect Challenge.</div>
+            <button onclick="runTest('user@mfa.com', 'password123', '1.2.3.4')">Run Test</button>
+        </div>
+
+        <div class="scenario">
+            <div class="scenario-title">MFA Login (Success)</div>
+            <div class="scenario-desc">Org requires MFA, user provides valid TOTP code.</div>
+            <button onclick="runTest('user@mfa.com', 'password123', '1.2.3.4', true)">Run Test (Auto-Generate
+                Code)</button>
+        </div>
+
+        <div class="scenario">
+            <div class="scenario-title">MFA Login (Wrong Code)</div>
+            <div class="scenario-desc">Org requires MFA, user provides invalid code (000000).</div>
+            <button onclick="runTest('user@mfa.com', 'password123', '1.2.3.4', false, '000000')">Run Test</button>
+        </div>
+
+        <div class="scenario">
+            <div class="scenario-title">MFA Missing (Org Enforced)</div>
+            <div class="scenario-desc">Org requires MFA, but user hasn't set it up. Expect Failure.</div>
+            <button onclick="runTest('user@mfa-missing.com', 'password123', '1.2.3.4')">Run Test</button>
+        </div>
+
+        <div class="scenario">
+            <div class="scenario-title">IP Restriction (Blocked)</div>
+            <div class="scenario-desc">Login from a restricted IP (10.0.0.5). Expect Access Denied.</div>
+            <button onclick="runTest('user@blocked.com', 'password123', '10.0.0.5')">Run Test</button>
+        </div>
+        <div class="scenario">
+            <div class="scenario-title">IP Restriction (Allowed)</div>
+            <div class="scenario-desc">Login from an allowed IP (1.2.3.4) for restricted org.</div>
+            <button onclick="runTest('user@blocked.com', 'password123', '1.2.3.4')">Run Test</button>
+        </div>
+
+    </div>
+
+    <div class="output" id="outputPanel">
+        <div style="padding-bottom: 10px; border-bottom: 1px solid #ddd; margin-bottom: 10px;">
+            <strong>Response</strong>
+        </div>
+        <div id="logContainer"></div>
+    </div>
+
+    <!-- Import OTPLib for frontend TOTP generation -->
+    <script src="https://unpkg.com/@otplib/preset-browser@^12.0.0/buffer.js"></script>
+    <script src="https://unpkg.com/@otplib/preset-browser@^12.0.0/index.js"></script>
+
+    <script>
+        const MFA_SECRET = 'JBSWY3DPEHPK3PXP'; // Matches db mock for user@mfa.com
+
+        async function runTest(identifier, secret, ip, generateMfa = false, manualMfaCode = null) {
+            // Clear previous logs
+            document.getElementById('logContainer').innerHTML = '';
+
+            let mfaCode = null;
+            if (generateMfa) {
+                mfaCode = window.otplib.authenticator.generate(MFA_SECRET);
+                console.log("Generated MFA Code:", mfaCode);
+            } else if (manualMfaCode) {
+                mfaCode = manualMfaCode;
+            }
+
+            // Generate Correlation ID
+            const correlationId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+
+            const query = `
+        mutation Login($identifier: String!, $secret: String!, $ip: String!, $mfaCode: String) {
+          login(data: {
+            identifier: $identifier,
+            secret: $secret,
+            mfaCode: $mfaCode,
+            metadata: {
+              ip: $ip
+            }
+          }) {
+            ... on LoginResponse {
+              message
+            }
+            ... on LoginSuccess {
+              __typename
+              token
+              refreshToken
+              message
+            }
+            ... on LoginFailure {
+              __typename
+              message
+            }
+            ... on LoginValidationError {
+              __typename
+              errors
+            }
+            ... on LoginChallenge {
+              __typename
+              challengeType
+              sessionId
+              message
+            }
+          }
+        }`;
+
+            const variables = { identifier, secret, ip, mfaCode };
+            const container = document.getElementById('logContainer');
+
+            // Show loading state
+            container.innerHTML = `<div style="color: #666;">Running test for ${identifier}...</div>`;
+
+            try {
+                const response = await fetch('http://localhost:8000/graphql', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Correlation-ID': correlationId
+                    },
+                    body: JSON.stringify({ query, variables })
+                });
+
+                const responseCid = response.headers.get('X-Correlation-ID');
+                const result = await response.json();
+
+                /*
+                 <div style="margin-bottom: 10px; padding: 5px; background: #eef; border-radius: 4px; font-size: 0.9em;">
+                        <strong>Correlation ID:</strong> ${responseCid}
+                    </div>
+                */
+                // Show clean output
+                container.innerHTML = `
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                `;
+
+            } catch (error) {
+                container.innerHTML = `<div style="color: red;">Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+
+</body>
+
+</html>

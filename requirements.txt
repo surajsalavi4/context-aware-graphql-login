@@ -1,0 +1,8 @@
+strawberry-graphql[debug-server]
+uvicorn
+starlette
+redis
+pyotp
+pyjwt
+pydantic[email]
+pytest
