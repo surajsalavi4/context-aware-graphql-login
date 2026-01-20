@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field, ValidationError
 import logging
 
 #=============== Logger
-#=============== Logger
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
@@ -23,14 +22,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from strawberry.asgi import GraphQL
 from typing import List,Dict,Any,Optional
 
-# Import helpers
+#================ Import helpers
 from helper import (
     get_domain, is_client_ip_restricted, 
     create_tokens, get_organization_by_domain, verify_user_credentials, 
     get_user_mfa_secret
 )
 
-# Correlation middleware setup
+#================ Correlation middleware setup
 class CorrelationIdMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         correlation_id = request.headers.get("X-Correlation-ID", str(uuid.uuid4()))
@@ -38,11 +37,6 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
         response.headers["X-Correlation-ID"] = correlation_id
         return response
 
-
-#=============== Interfaces
-@strawberry.interface
-class LoginResponse:
-    message: str
 
 #=============== Validations
 from pydantic import EmailStr
@@ -58,6 +52,12 @@ class LoginModel(BaseModel):
 class LoginValidationError(LoginResponse):
     message: str = "Invalid input"
     errors: strawberry.scalars.JSON
+
+
+#=============== Interfaces
+@strawberry.interface
+class LoginResponse:
+    message: str
 
 
 #=============== Entities
